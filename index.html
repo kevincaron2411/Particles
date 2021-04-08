@@ -1,0 +1,468 @@
+<script>
+
+//create html
+document.write('<body id="body" style="background:white;overflow:hidden;margin:0px"></body><canvas id="canvas"><canvas>');
+
+//canvas
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let width = 256,height = 144,borderMode = true,cameraX = 0,cameraY = 0,cameraR = 0,title = "NoNameJs",canvasColor = "white",borderColor = "black",cursor = "default";
+
+let windowWidth = 0,windowHeight = 0;
+
+function resizeCanvas()
+{
+    if (borderMode == true)
+    {
+        canvas.width = width * pixelScale();
+        canvas.height = height * pixelScale();
+    }
+    else
+    {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    canvas.style.marginLeft = (window.innerWidth - canvas.width) / 2;
+    canvas.style.marginTop = (window.innerHeight - canvas.height) / 2;
+}
+
+function pixelScale()
+{
+    if (width / height > window.innerWidth / window.innerHeight)
+    {
+        return window.innerWidth / width;
+    }
+    else
+    {
+        return window.innerHeight / height;
+    }
+}
+
+function updateWindowDimension()
+{
+    windowWidth = canvas.width / pixelScale();
+    windowHeight = canvas.height / pixelScale();
+}
+
+//global properties update
+window.addEventListener("load",function(){document.title = title;});
+
+function updateSettings()
+{
+    document.getElementById("body").style.background = borderColor;
+    document.getElementById("canvas").style.background = canvasColor;
+    document.title = title;
+    document.body.style.cursor = cursor;
+}
+
+//loop
+window.requestAnimationFrame(loop);
+
+const startTime = Date.now();
+let time = 0,lastUpdate = 0;
+let setupCalled = false;
+
+function loop()
+{
+    resizeCanvas();
+    updateWindowDimension();
+    updateSettings();
+    updateMouseAbsolutePosition();
+    step();
+    updateWindowDimension();
+    updateMouseAbsolutePosition();
+    display();
+
+    window.requestAnimationFrame(loop);
+}
+
+function step()
+{
+    time = Date.now() - startTime;
+
+    while (lastUpdate + 1000 / 60 < time)
+    {
+        if (typeof update == "function")
+        {
+            update();
+        }
+
+        resetButtonPressedList();
+
+        lastUpdate += 1000 / 60;
+    }
+}
+
+//setup preload call
+window.addEventListener("load",function()
+{
+    if (typeof preload == "function")
+    { 
+        preload();
+    }
+
+    resizeCanvas();
+    updateWindowDimension();
+
+    if (typeof setup == "function")
+    { 
+        setup();
+    }
+});
+
+//rendering
+function display()
+{
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.save();
+    ctx.scale(pixelScale(),pixelScale());
+    ctx.save();
+    ctx.translate(windowWidth / 2,windowHeight / 2);
+    ctx.rotate(degreesToRadians(-cameraR));
+    ctx.translate(-cameraX,-cameraY);
+
+    if (typeof displayScene == "function") { 
+        displayScene();
+    }
+
+    ctx.restore();
+
+    if (typeof displayHub == "function") { 
+        displayHub();
+    }
+
+    ctx.restore();
+}
+
+//math functions
+function degreesToRadians(a)
+{
+    return a * Math.PI / 180;
+}
+
+function random(a,b)
+{
+    return a + Math.random() * (b - a);
+}
+
+function angleToPosition(x1,y1,x2,y2)
+{
+    if (y1 > y2)
+    {
+      return -radiansToDegrees(Math.acos((x2 - x1) / distance(x1,y1,x2,y2)));
+    }
+    return -radiansToDegrees(Math.acos((x1 - x2) / distance(x1,y1,x2,y2))) + 180;
+}
+
+function distance(x1,y1,x2,y2)
+{
+    return Math.sqrt(Math.pow(x2 - x1,2) + Math.pow(y2 - y1,2));
+}
+
+function radiansToDegrees(a)
+{
+    return a * (180 / Math.PI);
+}
+
+function constrain(a,b,c)
+{
+    return Math.max(Math.min(a,c),b);
+}
+
+function lerp(a,b,c)
+{
+    return a + (b - a) / c;
+}
+
+function wait(ms)
+{
+    let d = new Date();
+    let d2 = null;
+    do { d2 = new Date(); }
+    while(d2-d < ms);
+}
+
+//loading images
+function loadImage(a)
+{
+    let imageHolder = new Image();
+    imageHolder.src = a;
+    
+    return imageHolder;
+}
+
+//drawing
+let alignX = 0,alignY = 0,fill = "black",stroke = "black",strokeWidth = 1,parallax = 1,opacity = 100,scaleX = 1,scaleY = 1;
+
+function fillRect(a,b,c,d,e)
+{
+    ctx.save();
+    ctx.translate(a + cameraX * (1 - parallax),b + cameraY * (1 - parallax));
+    ctx.rotate(degreesToRadians(e));
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = fill;
+    ctx.scale(scaleX,scaleY);
+    ctx.fillRect(-c / 2 - alignX * (c / 2),-d / 2 - alignY * (d / 2),c,d);
+    ctx.restore();
+}
+
+function strokeRect(a,b,c,d,e)
+{
+    ctx.save();
+    ctx.translate(a + cameraX * (1 - parallax),b + cameraY * (1 - parallax));
+    ctx.rotate(degreesToRadians(e));
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = stroke;
+    ctx.globalAlpha = opacity;
+    ctx.scale(scaleX,scaleY);
+    ctx.strokeRect(-c / 2 - alignX * (c / 2),-d / 2 - alignY * (d / 2),c,d);
+    ctx.restore();
+}
+
+function rect(a,b,c,d,e)
+{
+    ctx.save();
+    ctx.translate(a + cameraX * (1 - parallax),b + cameraY * (1 - parallax));
+    ctx.rotate(degreesToRadians(e));
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = fill;
+    ctx.globalAlpha = opacity;
+    ctx.scale(scaleX,scaleY);
+    ctx.fillRect(-c / 2 - alignX * (c / 2),-d / 2 - alignY * (d / 2),c,d);
+    ctx.strokeRect(-c / 2 - alignX * (c / 2),-d / 2 - alignY * (d / 2),c,d);
+    ctx.restore();
+}
+
+function image(a,b,c,d,e,f)
+{
+    ctx.save();
+    ctx.translate(b + cameraX * (1 - parallax),c + cameraY * (1 - parallax));
+    ctx.rotate(degreesToRadians(f));
+    ctx.globalAlpha = opacity;
+    ctx.scale(scaleX,scaleY);
+    ctx.drawImage(a,-d / 2 - alignX * (d / 2),-e / 2 - alignY * (e / 2),d,e);
+    ctx.restore();
+}
+
+//input
+let keysDown = {},buttonsDown = {},buttonsPressed = {},keysPressed = {};
+
+window.addEventListener("keydown",function(e)
+{
+    keysDown[e.keyCode] = 1;
+    keysPressed[e.keyCode] = 1;
+});
+
+window.addEventListener("keyup",function(e)
+{
+    delete keysDown[e.keyCode];
+    delete keysPressed[e.keyCode];
+});
+
+window.addEventListener("mousedown",function(e)
+{
+    buttonsDown[e.button] = 1;
+    buttonsPressed[e.button] = 1;
+});
+
+window.addEventListener("mouseup",function(e)
+{
+    delete buttonsDown[e.button];
+    delete buttonsPressed[e.button];
+});
+
+function keyDown(key)
+{
+    if (key == undefined && Object.keys(keysDown).length > 0)
+    {
+        return 1;
+    }
+
+    if (keysDown[key] == 1)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+function keyPressed(key)
+{
+    if (key == undefined && Object.keys(keysPressed).length > 0)
+    {
+        return 1;
+    }
+
+    if (keysPressed[key] == 1)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+function mouseDown(button)
+{
+    if (button == undefined && Object.keys(buttonsDown).length > 0)
+    {
+        return 1;
+    }
+
+    if (buttonsDown[button] == 1)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+function mousePressed(button)
+{
+    if (button == undefined && Object.keys(buttonsPressed).length > 0)
+    {
+        return 1;
+    }
+
+    if (buttonsPressed[button] == 1)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+function resetButtonPressedList()
+{
+    keysPressed = [];
+    buttonsPressed = [];
+}
+
+//mouse position
+let mwx = 0,mwy = 0,mcx = 0,mcy = 0,msx = 0,msy = 0;
+
+window.addEventListener("mousemove",function(e){updateMousePosition(e)});
+window.addEventListener("mousewheel",function(e){updateMousePosition(e)});
+
+function updateMousePosition(e)
+{
+    mwx = e.clientX;
+    mwy = e.clientY;
+}
+
+function updateMouseAbsolutePosition()
+{
+    mwx = constrain(mwx,0,window.innerWidth);
+    mwy = constrain(mwy,0,window.innerHeight);
+
+    mcx = constrain((mwx - parseInt(canvas.style.marginLeft)) / pixelScale(),0,windowWidth);
+    mcy = constrain((mwy - parseInt(canvas.style.marginTop)) / pixelScale(),0,windowHeight);
+
+    msx = translateMousePositionWithCameraRotation((mcx - (windowWidth / 2 - cameraX)),(mcy - (windowHeight / 2 - cameraY)),cameraX,cameraY,-cameraR).x + cameraX;
+    msy = translateMousePositionWithCameraRotation((mcx - (windowWidth / 2 - cameraX)),(mcy - (windowHeight / 2 - cameraY)),cameraX,cameraY,-cameraR).y + cameraY;
+}
+
+function translateMousePositionWithCameraRotation(a,b,c,d,e)
+{
+    a -= c;
+    b -= d;
+
+    var radians = e * (Math.PI / 180);
+
+    var cos = Math.cos(radians);
+    var sin = Math.sin(radians);
+    var x = (a * cos) + (b * sin);
+    var y = (-a * sin) + (b * cos);
+
+    x = Math.floor(x * 100) / 100;
+    y = Math.floor(y * 100) / 100;
+
+    return {x, y};
+}
+
+</script>
+<script>
+    let particles = [];
+
+    function update()
+    {
+        if (mouseDown() == 1)
+        {
+            for (let i = 0;i < 10;i ++)
+            {
+                particles[particles.length] = new Particle(msx,msy);
+            }
+        }
+        
+        for (let i = particles.length - 1;i >= 0;i --)
+        {
+            particles[i].update();
+        
+            if (particles[i].isDead() == true)
+            {
+                particles.splice(i,1);
+            }
+        }
+        
+        cameraX = msx / 2;
+        cameraY = msy / 2;
+    }
+        
+    function setup()
+    {
+        borderMode = false;
+    }
+        
+    function displayScene()
+    {
+        opacity = 1;
+        stroke = "rgb(200,200,200)";
+        strokeRect(0,0,windowWidth,windowHeight,0);
+        
+        for (let i = particles.length - 1;i >= 0;i --)
+        {
+            particles[i].display();
+        }
+    }
+        
+    function Particle(x,y)
+    {
+        this.x = x;
+        this.y = y;
+        this.r = 0;
+        this.size = random(1,5);
+        this.velX = random(-1,1);
+        this.velY = random(-1,1);
+        this.velR = random(-5,5);
+        this.lifeTime = 60;
+        
+        this.update = function()
+        {
+            this.velX -= 0.01 * this.velX;
+            this.velY -= 0.01 * this.velY;
+            this.velR -= 0.01 * this.velR;
+        
+            this.x += this.velX;
+            this.y += this.velY;
+            this.r += this.velR;
+        
+            this.lifeTime --;
+        }
+        
+        this.display = function()
+        {
+            fill = "rgb(255,0,50)";
+            opacity = this.lifeTime / 60;
+            fillRect(this.x,this.y,this.size,this.size,this.r);
+        }
+        
+        this.isDead = function()
+        {
+            if (this.lifeTime <= 0)
+            {
+                return true;
+            }
+            return false;
+        }
+    }
+        
+</script>
